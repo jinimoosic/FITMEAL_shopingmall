@@ -1,0 +1,217 @@
+<!-- src/main/resources/templates/running.html -->
+<!DOCTYPE html>
+
+
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+	xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+	layout:decorate="~{layout}">
+
+<head>
+<title>러닝예약 게시판</title>
+
+
+<style>
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.table thead th {
+  background-color: #f5f5f5;
+  color: #111;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px 8px;
+  border-bottom: 2px solid #ddd;
+}
+
+.table tbody td {
+  text-align: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.table tbody td:nth-child(4) {
+  text-align: left;
+  padding-left: 12px;
+  width: 40%; 
+}
+
+.table tbody td:nth-child(6) {
+  text-align: left;
+  padding-left: 12px;
+  width: 10%;
+}
+
+.table tbody td:nth-child(1) { width: 5%; }
+.table tbody td:nth-child(2) { width: 20%; }
+.table tbody td:nth-child(3) { width: 15%; }
+.table tbody td:nth-child(5) { width: 10%; }
+
+.hint-closed {
+  color: #842029;
+  font-weight: bold;
+  margin-left: 6px;
+}
+.hint-full {
+  color: #d39e00;
+  font-weight: bold;
+  margin-left: 6px;
+}
+
+.text-muted {
+  color: #999;
+}
+
+.table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.row-closed {
+	opacity: 0.5; 
+}
+
+.hint {
+	color: red;
+	font-weight: bold;
+	margin-left: 5px;
+}
+
+.hint-closed {
+	color: gray;
+	font-weight: bold;
+	margin-left: 5px;
+}
+
+.hint-full {
+	color: red;
+	font-weight: bold;
+	margin-left: 5px;
+}
+</style>
+</head>
+
+<body>
+	<div layout:fragment="content">
+	
+	<div class="text-center mb-4">
+    <h1 style="font-family: 'Poppins', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+               font-weight: 700;
+               font-size: 2.9em;
+               color: #1a73e8;
+               margin-bottom: 6px;
+               letter-spacing: 1px;">
+        RunningMate
+    </h1>
+    <p style="font-size: 15px; color: #555; margin: 0;">
+        함께 달릴 러닝메이트를 지금 만나보세요 🏃‍♀️🏃‍♂️
+    </p>
+</div>
+		
+<!-- 검색창 -->
+<div class="mb-3" style="max-width:500px; margin:auto;">
+    <form th:action="@{/community/running}" method="get" class="d-flex">
+        <input type="text" name="keyword" class="form-control me-2"
+               placeholder="제목 / 작성자 / 주소 검색" th:value="${keyword}"
+               style="border-radius:8px; padding:6px 10px; font-size:14px; flex:1 1 auto; min-width:150px;">
+        <button type="submit" class="btn"
+                style="background:#111; color:#fff; border:none; border-radius:8px; padding:6px 16px; font-weight:600; white-space:nowrap;">
+            검색
+        </button>
+    </form>
+</div>
+
+		<div class="text-end mb-3">
+			<a class="btn btn-primary" th:href="@{/community/running/run_new}">모집하기</a>
+		</div>
+
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>번호</th>
+					<th>시간</th>
+					<th>장소</th>
+					<th>제목</th>
+					<th>작성자</th>
+					<th>인원</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr th:each="post, loop : ${posts}"
+					th:classappend="${#temporals.createNow().isAfter(post.endTime)} ? 'row-closed'">
+
+					<!-- 번호 -->
+					<td
+						th:text="${paging.totalElements - (paging.number * paging.size) - loop.index}"></td>
+
+					<!-- 모임시간: 날짜 + 시작시간 ~ 종료시간 -->
+					<td
+						th:text="${#temporals.format(post.startTime, 'yy.MM.dd E')} + ' ' + ${#temporals.format(post.startTime, 'HH:mm')} + ' ~ ' + ${#temporals.format(post.endTime, 'HH:mm')}"></td>
+
+					<!-- 러닝장소 (주소) -->
+					<td th:text="${post.shortAddress}">주소</td>
+
+					<!-- 제목 -->
+					<td><a
+						th:href="@{|/community/running/run_detail/${post.postNum}|}"
+						th:text="${post.title}"
+						th:classappend="${#temporals.createNow().isAfter(post.endTime)} ? 'text-muted'"></a>
+					</td>
+					
+					<!-- 작성자 -->
+					<td th:text="${post.user.userId}"></td>
+					
+					<!-- 참여인원 및 상태 -->
+					<td><span
+						th:text="${post.currentParticipants} + '/' + ${post.maxParticipants}">0/10</span>
+						<span th:if="${#temporals.createNow().isAfter(post.endTime)}"
+						class="hint-closed">종료</span> <span
+						th:if="${!#temporals.createNow().isAfter(post.endTime)} and ${post.currentParticipants == post.maxParticipants}"
+						class="hint-full">마감</span></td>
+						
+
+				</tr>
+			</tbody>
+		</table>
+
+
+		<!-- 페이징  -->
+		<div th:if="${paging != null and !paging.isEmpty()}">
+			<ul class="pagination justify-content-center">
+
+				<li class="page-item"
+					th:classappend="${!paging.hasPrevious}? 'disabled'"><a
+					class="page-link"
+					th:href="@{|?page=${paging.number -1}&keyword=${keyword}|}">이전</a>
+				</li>
+
+
+				<li th:each="page : ${#numbers.sequence(0, paging.totalPages-1)}"
+					th:if="${page >= paging.number-5 and page <= paging.number+5}"
+					th:classappend="${page==paging.number} ? 'active'"
+					class="page-item"><a th:text="${page+1}" class="page-link"
+					th:href="@{|?page=${page}&keyword=${keyword}|}"></a></li>
+
+
+				<li class="page-item"
+					th:classappend="${!paging.hasNext}? 'disabled'"><a
+					class="page-link"
+					th:href="@{|?page=${paging.number +1}&keyword=${keyword}|}">다음</a>
+				</li>
+			</ul>
+		</div>
+
+
+
+
+
+
+
+
+	</div>
+
+</body>
+
+</html>
