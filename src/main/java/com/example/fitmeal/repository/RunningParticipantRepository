@@ -1,0 +1,40 @@
+package com.example.fitmeal.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.example.fitmeal.domain.RunningParticipant;
+import com.example.fitmeal.domain.RunningParticipantStatus;
+import com.example.fitmeal.domain.RunningPost;
+import com.example.fitmeal.domain.Users;
+
+public interface RunningParticipantRepository extends JpaRepository<RunningParticipant, Integer>{
+
+	
+   	List<RunningParticipant> findByPost(RunningPost post);
+
+    boolean existsByPostAndUserAndStatus(RunningPost post, Users user, RunningParticipantStatus status);
+
+    Optional<RunningParticipant> findByPostAndUserAndStatus(RunningPost post, Users user, RunningParticipantStatus status);
+
+    Optional<RunningParticipant> findByPostAndUser(RunningPost post, Users user);
+    
+    long countByPostAndStatus(RunningPost post, RunningParticipantStatus status);
+
+    Optional<RunningParticipant> findByPostAndHostTrue(RunningPost post);
+
+    List<RunningParticipant> findByUser_UserNum(Integer userNum);
+    Optional<RunningParticipant> findByPost_PostNumAndUser_UserNum(Integer postNum, Integer userNum);
+    long countByPost_PostNum(Integer postNum);
+
+    @Query("SELECT rp.user FROM RunningParticipant rp WHERE rp.post = :post AND rp.status = 'JOINED' AND rp.user.isBlocked = false")
+    List<Users> findActiveParticipantsByPost(@Param("post") RunningPost post);
+    
+    List<RunningParticipant> findByPostAndStatus(RunningPost post, RunningParticipantStatus status);
+
+    void deleteByPost(RunningPost post);
+}
