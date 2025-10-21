@@ -35,3 +35,7 @@
 | **API** | Kakao Map API |
 
 ---
+
+## 기타 참고 자료
+- 개발일지 노션 링크 https://www.notion.so/1d68ceb36e4f8009b765c4f6b934d12c?source=copy_link
+- 프로젝트 ppt https://www.miricanvas.com/v/150goaw
