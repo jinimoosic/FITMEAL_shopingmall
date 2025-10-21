@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+	xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+	layout:decorate="~{layout}">
+<head>
+  <meta charset="utf-8">
+  <title>러닝 모집글 등록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:20px}
+    .container{display:grid;grid-template-columns:1fr 1fr; gap:24px}
+    .card{border:1px solid #ddd;border-radius:12px;padding:16px}
+    .row{display:flex;gap:12px}
+    label{display:block;font-weight:600;margin:8px 0 4px}
+    input, textarea, select{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box;}
+    #map{width:100%;height:520px;border-radius:12px}
+    .btn{background:#111;color:#fff;border:none;border-radius:10px;padding:12px 16px;cursor:pointer}
+    .btn:disabled{opacity:.5}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+    .stats div{background:#fafafa;border:1px solid #eee;border-radius:10px;padding:8px 10px;font-size:14px}
+    .hint{font-size:12px;color:#777;margin-top:4px}
+  </style>
+</head>
+<body>
+	<div layout:fragment="content">
+  
+  
+  <form id="postForm" class="container" method="post" action="/community/running/run_new" th:object="${runningPostDTO}">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+    <!-- 좌: 지도/코스 -->
+    <section class="card">
+      <h2>코스 설정</h2>
+      <div id="map"></div>
+
+      <div class="stats">
+        <div>시작 좌표: <span id="startCoord">-</span></div>
+        <div>총 거리: <span id="totalDistance">0.000</span> km</div>
+        <div>예상 시간: <span id="estimatedTimeText">0분</span></div>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <label for="pace">페이스 (분/킬로)</label>
+          <select id="pace">
+            <option value="5.0">5:00 /km</option>
+            <option value="5.5">5:30 /km</option>
+            <option value="6.0" selected>6:00 /km</option>
+            <option value="6.5">6:30 /km</option>
+            <option value="7.0">7:00 /km</option>
+          </select>
+          <div class="hint">페이스에 따라 예상 시간이 자동 계산됩니다.</div>
+        </div>
+        <button class="btn" type="button" id="resetRoute" style="align-self:flex-end">경로 초기화</button>
+      </div>
+
+      <!-- DTO 매핑용 히든필드 -->
+      <input type="hidden" name="locationLat" id="locationLat">
+      <input type="hidden" name="locationLng" id="locationLng">
+      <input type="hidden" name="course.startLat" id="courseStartLat">
+      <input type="hidden" name="course.startLng" id="courseStartLng">
+      <input type="hidden" name="course.totalDistance" id="courseTotalDistance">
+      <input type="hidden" name="course.estimatedTime" id="courseEstimatedTime">
+      <input type="hidden" name="course.pathJson" id="coursePathJson">
+      <!-- 새로 추가: 주소 -->
+      <input type="hidden" name="address" id="address">
+    </section>
+
+    <!-- 우: 모집 정보 -->
+    <section class="card">
+      <h2>모집 정보</h2>
+
+      <input type="hidden" name="userNum" value="1">
+
+      <label for="title">제목</label>
+      <input id="title" name="title" type="text" maxlength="255" required placeholder="예: 토요일 아침 10km 러닝">
+
+      <label for="content">내용</label>
+      <textarea id="content" name="content" rows="6" required placeholder="집합/출발/휴식/주의사항 등"></textarea>
+
+      <div class="row">
+        <div style="flex:1">
+          <label for="date">러닝 날짜</label>
+          <input id="date" name="date" type="date" required>
+        </div>
+        <div style="flex:1">
+          <label for="startTimeOnly">시작 시간</label>
+          <input id="startTimeOnly" name="startTimeOnly" type="time" required min="00:00" max="23:59">
+        </div>
+        <div style="flex:1">
+          <label for="endTimeOnly">종료 시간</label>
+          <input id="endTimeOnly" name="endTimeOnly" type="time" required min="00:01" max="23:59">
+          <div class="hint">시작시간 + 예상시간으로 자동 채워집니다.</div>
+        </div>
+      </div>
+
+      <label for="maxParticipants">최대 인원</label>
+      <input id="maxParticipants" name="maxParticipants" type="number" min="1">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <div style="color:#666">기준지: 김포시 구래동 <b>구래역</b></div>
+        <button class="btn" type="submit">등록하기</button>
+      </div>
+    </section>
+  </form>
+
+  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d80965e1dd7f5032fdf92b78efe9b810&libraries=services,geometry"></script>
+  <script>
+    const map = new kakao.maps.Map(document.getElementById('map'), {
+      center: new kakao.maps.LatLng(37.5665,126.9780),
+      level: 5
+    });
+
+    const ps = new kakao.maps.services.Places();
+    ps.keywordSearch('구래역', (data, status) => {
+      if (status === kakao.maps.services.Status.OK && data.length>0) {
+        const c = new kakao.maps.LatLng(data[0].y, data[0].x);
+        map.setCenter(c);
+        new kakao.maps.Marker({map, position:c, title:'구래역'});
+      }
+    });
+
+    let path = [];
+    let polyline = new kakao.maps.Polyline({map, path: [], strokeWeight: 3, strokeColor:'#FF0000', strokeOpacity:1.0, strokeStyle:'dashed'});
+    let markers = [];
+    const startImage = new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png', new kakao.maps.Size(24,35));
+    const endImage   = new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', new kakao.maps.Size(24,35));
+    let startMarker = null;
+    let endMarker = null;
+
+    const startCoordEl = document.getElementById('startCoord');
+    const totalDistanceEl = document.getElementById('totalDistance');
+    const estimatedTimeTextEl = document.getElementById('estimatedTimeText');
+    const locationLatEl = document.getElementById('locationLat');
+    const locationLngEl = document.getElementById('locationLng');
+    const courseStartLatEl = document.getElementById('courseStartLat');
+    const courseStartLngEl = document.getElementById('courseStartLng');
+    const courseTotalDistanceEl = document.getElementById('courseTotalDistance');
+    const courseEstimatedTimeEl = document.getElementById('courseEstimatedTime');
+    const coursePathJsonEl = document.getElementById('coursePathJson');
+    const addressEl = document.getElementById('address');
+
+    const paceSelect = document.getElementById('pace');
+    const startTimeEl = document.getElementById('startTimeOnly');
+    const endTimeEl = document.getElementById('endTimeOnly');
+    const dateEl = document.getElementById('date');
+
+    function fetchAddress(lat, lng) {
+      fetch(`https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`, {
+        headers: { 'Authorization': # }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.documents && data.documents.length > 0){
+          addressEl.value = data.documents[0].address.address_name;
+          console.log('주소 설정:', addressEl.value);
+        }
+      })
+      .catch(err => console.error('주소 변환 오류:', err));
+    }
+
+    kakao.maps.event.addListener(map, 'click', (e)=>{
+      const latlng = e.latLng;
+      path.push(latlng);
+      polyline.setPath(path);
+
+      const mk = new kakao.maps.Marker({map, position:latlng});
+      markers.push(mk);
+
+      if (!startMarker) startMarker = new kakao.maps.Marker({map, position:path[0], title:'시작 위치', image:startImage});
+      if (endMarker) endMarker.setMap(null);
+      if (path.length>=2) endMarker = new kakao.maps.Marker({map, position:path[path.length-1], title:'끝 위치', image:endImage});
+
+      startCoordEl.textContent = `${path[0].getLat().toFixed(6)}, ${path[0].getLng().toFixed(6)}`;
+      locationLatEl.value = path[0].getLat();
+      locationLngEl.value = path[0].getLng();
+      courseStartLatEl.value = path[0].getLat();
+      courseStartLngEl.value = path[0].getLng();
+
+      updateDistanceAndTime();
+
+      if(path.length === 1) fetchAddress(path[0].getLat(), path[0].getLng());
+    });
+
+    function updateDistanceAndTime(){
+      let distanceMeters = (typeof polyline.getLength==='function') ? polyline.getLength() : (kakao.maps.geometry?.spherical?.computeLength? kakao.maps.geometry.spherical.computeLength(polyline.getPath()) : 0);
+      const km = distanceMeters/1000;
+      totalDistanceEl.textContent = km.toFixed(3);
+
+      const paceMinPerKm = parseFloat(paceSelect.value);
+      const totalMinutes = Math.max(1, Math.round(km*paceMinPerKm));
+      const hh = Math.floor(totalMinutes/60);
+      const mm = totalMinutes%60;
+      estimatedTimeTextEl.textContent = (hh>0?`${hh}시간 `:'')+`${mm}분`;
+
+      courseTotalDistanceEl.value = km.toFixed(3);
+      courseEstimatedTimeEl.value = totalMinutes;
+      coursePathJsonEl.value = JSON.stringify(path.map(p=>({lat:p.getLat(), lng:p.getLng()})));
+
+      autoFillEndTime(totalMinutes);
+    }
+
+    paceSelect.addEventListener('change', updateDistanceAndTime);
+    startTimeEl.addEventListener('change',()=>{ const m=parseInt(courseEstimatedTimeEl.value||'0',10); if(m>0) autoFillEndTime(m); });
+
+    function autoFillEndTime(totalMinutes){
+      if(!startTimeEl.value) return;
+      const [h,m] = startTimeEl.value.split(':').map(Number);
+      let sDate = new Date(dateEl.value);
+      sDate.setHours(h); sDate.setMinutes(m);
+      const eDate = new Date(sDate.getTime()+totalMinutes*60000);
+      endTimeEl.value = `${String(eDate.getHours()).padStart(2,'0')}:${String(eDate.getMinutes()).padStart(2,'0')}`;
+    }
+
+    document.getElementById('resetRoute').addEventListener('click', ()=>{
+      path=[]; polyline.setPath([]);
+      markers.forEach(m=>m.setMap(null));
+      markers=[]; startMarker?.setMap(null); startMarker=null;
+      endMarker?.setMap(null); endMarker=null;
+      startCoordEl.textContent='-'; totalDistanceEl.textContent='0.000'; estimatedTimeTextEl.textContent='0분';
+      [locationLatEl,locationLngEl,courseStartLatEl,courseStartLngEl,courseTotalDistanceEl,courseEstimatedTimeEl,coursePathJsonEl,addressEl].forEach(el=>el.value='');
+    });
+
+    document.getElementById('postForm').addEventListener('submit', (e)=>{
+      if(path.length<1){ e.preventDefault(); alert('지도를 클릭해 출발 지점을 지정하세요.'); return; }
+      if(path.length<2){ e.preventDefault(); alert('경로를 2개 이상 클릭해 주세요.'); return; }
+
+      const startTimeParts = startTimeEl.value.split(':');
+      const endTimeParts   = endTimeEl.value.split(':');
+      const d = dateEl.value;
+      const startHidden = document.createElement('input');
+      startHidden.type='hidden'; startHidden.name='startTime';
+      startHidden.value=`${d}T${startTimeParts[0].padStart(2,'0')}:${startTimeParts[1].padStart(2,'0')}`;
+      const endHidden = document.createElement('input');
+      endHidden.type='hidden'; endHidden.name='endTime';
+      endHidden.value=`${d}T${endTimeParts[0].padStart(2,'0')}:${endTimeParts[1].padStart(2,'0')}`;
+      e.target.appendChild(startHidden); e.target.appendChild(endHidden);
+    });
+
+    // 날짜 제한
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth()+1).padStart(2,'0');
+    const dd = String(today.getDate()).padStart(2,'0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    dateEl.setAttribute('min', todayStr);
+    if(dateEl.value < todayStr) dateEl.value = todayStr;
+
+    function updateStartTimeMin() {
+      if(dateEl.value === todayStr){
+        const now = new Date();
+        startTimeEl.setAttribute('min', `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
+      } else { startTimeEl.removeAttribute('min'); }
+    }
+
+    function updateEndTimeMin() {
+      if(startTimeEl.value) endTimeEl.setAttribute('min', startTimeEl.value);
+      else endTimeEl.removeAttribute('min');
+    }
+
+    dateEl.addEventListener('change', updateStartTimeMin);
+    startTimeEl.addEventListener('change', updateEndTimeMin);
+    updateStartTimeMin();
+    updateEndTimeMin();
+  </script>
+  </div>
+</body>
+</html>
