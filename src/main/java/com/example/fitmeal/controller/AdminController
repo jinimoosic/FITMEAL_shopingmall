@@ -1,0 +1,183 @@
+package com.example.fitmeal.controller;
+
+import java.io.IOException;
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.example.fitmeal.domain.OrderInfo;
+import com.example.fitmeal.domain.OrderInfo.DeliveryStatus;
+import com.example.fitmeal.domain.Product;
+import com.example.fitmeal.dto.ProductRegisterDto;
+import com.example.fitmeal.dto.ProductUpdateDTO;
+import com.example.fitmeal.service.OrderService;
+import com.example.fitmeal.service.ProductService;
+import com.example.fitmeal.service.QnaService;
+
+import lombok.RequiredArgsConstructor;
+
+@Controller
+@RequestMapping("/admin")
+@RequiredArgsConstructor
+public class AdminController {
+	
+    private final ProductService productService;
+    private final OrderService orderService;
+    private final QnaService qnaService;
+
+
+
+    // ------------------ 대시보드 ------------------ 
+    @GetMapping
+    public String dashboard(Model model) {
+        long totalProducts = productService.countProducts();
+        long totalOrders = orderService.countOrders();
+        long pendingQna = qnaService.countPendingQna();
+        
+        model.addAttribute("totalProducts", totalProducts);
+        model.addAttribute("totalOrders", totalOrders);
+        model.addAttribute("pendingQna", pendingQna);
+        model.addAttribute("title", "대시보드");
+        return "admin/dashboard";
+    }
+
+    // ------------------ 상품 관리 ------------------ 
+    @GetMapping("/products")
+    public String productList(Model model) {
+        List<Product> products = productService.getAllProducts();
+        model.addAttribute("products", products);
+        model.addAttribute("title", "상품 관리");
+        return "admin/products";
+    }
+
+    @GetMapping("/products/register")
+    public String showProductForm(Model model) {
+        model.addAttribute("product", new Product());
+        model.addAttribute("title", "상품 등록");
+        return "admin/product_form";
+    }
+
+    @PostMapping("/products/register")
+    public String registerProduct(
+        @ModelAttribute ProductRegisterDto registerDto,
+        @RequestParam("imageFiles") List<MultipartFile> imageFiles, 
+        RedirectAttributes redirectAttributes) {
+        
+        try {
+            productService.registerProduct(registerDto, imageFiles); 
+            redirectAttributes.addFlashAttribute("message", "상품이 성공적으로 등록되었습니다.");
+        } catch (IOException e) {
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("error", "상품 등록 중 파일 처리에 실패했습니다.");
+            return "redirect:/admin/products/register";
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", "상품 등록 실패: " + e.getMessage());
+            return "redirect:/admin/products/register";
+        }
+        return "redirect:/admin/products";
+    }
+
+
+    @GetMapping("/products/edit/{productNum}") 
+    public String editProduct(@PathVariable("productNum") String productNum, Model model) {
+
+        Product product = productService.findProductByNum(productNum); 
+        model.addAttribute("product", product);
+        model.addAttribute("title", "상품 수정");
+        return "admin/product_form";
+    }
+
+ 
+    @PostMapping("/products/edit/{productNum}") 
+    public String updateProduct(
+        @PathVariable("productNum") String productNum, 
+
+        @ModelAttribute ProductUpdateDTO productDto,
+
+        @RequestParam(value = "imageFiles", required = false) List<MultipartFile> imageFiles, 
+        @RequestParam(value = "deleteImageNums", required = false) List<Integer> deleteImageNums,
+        RedirectAttributes redirectAttributes) {
+        
+        try {
+            productService.updateProduct(productNum, productDto, imageFiles, deleteImageNums); 
+            redirectAttributes.addFlashAttribute("message", productNum + "번 상품이 성공적으로 수정되었습니다.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("error", "상품 수정 실패: " + e.getMessage());
+            return "redirect:/admin/products/edit/" + productNum; 
+        }
+
+        return "redirect:/admin/products";
+    }
+
+ 
+    @PostMapping("/products/delete/{productNum}") 
+    public String deleteProduct(@PathVariable("productNum") String productNum, RedirectAttributes redirectAttributes) {
+        try {
+            productService.deleteProduct(productNum);
+            redirectAttributes.addFlashAttribute("message", productNum + "번 상품이 성공적으로 삭제되었습니다.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "상품 삭제 실패: " + e.getMessage());
+        }
+        return "redirect:/admin/products";
+    }
+
+    // ------------------ 주문 관리 ------------------
+    @GetMapping("/orders")
+    public String orderList(Model model) {
+        List<OrderInfo> orders = orderService.findAllOrders();
+        model.addAttribute("title", "관리자 주문 관리");
+        model.addAttribute("orders", orders);
+        model.addAttribute("deliveryStatuses", com.example.fitmeal.domain.OrderInfo.DeliveryStatus.values());
+        return "admin/orders";
+    }
+  // 주문 상태 변경 API (관리자용)
+  @PostMapping("/orders/update-status")
+  @ResponseBody 
+  public ResponseEntity<String> updateOrderStatus(@RequestParam("orderNum") Integer orderNum,
+                                                 @RequestParam("status") String status) {
+      try {
+          DeliveryStatus newStatus = DeliveryStatus.valueOf(status.toUpperCase());
+          orderService.updateDeliveryStatus(orderNum, newStatus);
+          return ResponseEntity.ok("success");
+      } catch (Exception e) {
+          return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+      }
+  }
+
+  @GetMapping("/orders/{id}")
+  public String orderDetail(@PathVariable("id") Long id, Model model) {
+
+      OrderInfo order = orderService.findOrderById(id.intValue());
+
+      model.addAttribute("order", order);
+      model.addAttribute("title", "주문 상세");
+      return "admin/order_detail";
+  }
+
+  
+  
+  
+  
+  @GetMapping("/qna")
+  public String qnaList(Model model) {
+	  return "redirect:/support/list";
+  }
+  
+  @GetMapping("/notice")
+  public String noticeList(Model model) {
+	  return "redirect:/notice";
+  }
+    
+}
