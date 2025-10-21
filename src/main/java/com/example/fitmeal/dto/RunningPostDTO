@@ -1,0 +1,64 @@
+package com.example.fitmeal.dto;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class RunningPostDTO {
+
+    @NotNull
+    private Integer userNum;
+
+    @NotBlank @Size(max = 255)
+    private String title;
+
+    @NotBlank
+    private String content;
+
+    private String locationLat;
+    private String locationLng;
+
+    @NotNull
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate date;
+
+    @NotNull
+    @DateTimeFormat(pattern = "HH:mm")
+    private LocalTime startTimeOnly;
+
+    @NotNull
+    @DateTimeFormat(pattern = "HH:mm")
+    private LocalTime endTimeOnly;
+
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
+    
+    @Min(1)
+    private Integer maxParticipants;
+
+    @NotNull
+    private RunningCourseDTO course;
+    
+    private String address; 
+    
+
+    
+
+}
