@@ -1,0 +1,108 @@
+package com.example.fitmeal.domain;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.Objects;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
+public class Users {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer userNum;
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String userId;
+
+    @Column(nullable = false, length = 100)
+    private String password;
+
+    @Column(nullable = false, length = 50)
+    private String userName;
+
+    @Column(nullable = false, unique = true, length = 100)
+    private String email;
+
+    @Column(length = 20)
+    private String phoneNum;
+
+    @Column(length = 200)
+    private String address1;
+
+    @Column(length = 200)
+    private String address2;
+
+    @Column(length = 20)
+    private String userBirth;
+
+    @Column(length = 10)
+    private String gender;
+
+    @Column(updatable = false)
+    private LocalDateTime createDate;
+
+    private LocalDateTime updateDate;
+
+    @Column(nullable = false)
+    private int warnCount;
+
+    @Column(nullable = false)
+    private boolean isBlocked;
+    
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isRegistrationCompleted = false;
+
+    @Column(nullable = false)
+    private String role;
+
+    @Column(unique = true)
+    private String kakaoId;
+
+    @Column(unique = true)
+    private String naverId;
+
+
+
+    public void addWarningCount(int count) {
+        this.warnCount += count;
+        if (this.warnCount >= 3) {
+            this.isBlocked = true;
+        }
+    }
+
+    public void blockUser() {
+        this.isBlocked = true;
+    }
+
+    @Override
+    public String toString() {
+        return "Users{" +
+                "userNum=" + userNum +
+                ", userName='" + userName + '\'' +
+                ", email='" + email + '\'' +
+                ", isRegistrationCompleted=" + isRegistrationCompleted +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Users users = (Users) o;
+        return Objects.equals(userNum, users.userNum);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(userNum);
+    }
+}
