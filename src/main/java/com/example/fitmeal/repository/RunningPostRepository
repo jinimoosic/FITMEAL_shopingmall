@@ -1,0 +1,35 @@
+package com.example.fitmeal.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.example.fitmeal.domain.RunningPost;
+import com.example.fitmeal.domain.Users;
+
+public interface RunningPostRepository extends JpaRepository<RunningPost, Integer>{
+
+
+	  List<RunningPost> findByUser(Users user);
+	
+
+    // RunningCourse까지 한 번에 fetch
+    @Query("SELECT rp FROM RunningPost rp LEFT JOIN FETCH rp.runningCourse WHERE rp.postNum = :postNum")
+    Optional<RunningPost> findByIdWithCourse(Integer postNum);
+	
+    //페이징
+    Page<RunningPost> findAll(Pageable pageable);
+    
+    
+    @Query("SELECT p FROM RunningPost p " +
+            "WHERE p.title LIKE %:keyword% " +
+            "   OR p.address LIKE %:keyword% " +
+            "   OR p.user.userId LIKE %:keyword%")
+     Page<RunningPost> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+
+}
