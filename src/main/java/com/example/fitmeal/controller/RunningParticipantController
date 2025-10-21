@@ -1,0 +1,116 @@
+package com.example.fitmeal.controller;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.fitmeal.domain.Users;
+import com.example.fitmeal.security.CustomUserDetails;
+import com.example.fitmeal.service.RunningParticipantService;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/community/running")
+public class RunningParticipantController {
+
+    private final RunningParticipantService runningParticipantService;
+
+    // 참여
+    @PostMapping("/{postNum}/join")
+    public Map<String, Object> join(@PathVariable("postNum") Integer postNum,
+                                    @AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            return Map.of("success", false, "message", "로그인이 필요합니다.");
+        }
+        Users user = userDetails.getUser();
+        
+        if (user.isBlocked()) {
+            return Map.of("success", false, "message", "블락된 유저는 러닝 참여가 불가합니다.");
+        }
+
+        try {
+            boolean joined = runningParticipantService.joinRunningPost(postNum, user);
+            int currentParticipants = runningParticipantService.getCurrentParticipants(postNum);
+            return Map.of(
+                    "success", true,
+                    "joined", joined,
+                    "currentParticipants", currentParticipants
+            );
+        } catch (RuntimeException e) {
+            return Map.of("success", false, "message", e.getMessage());
+        }
+    }
+
+
+    // 취소
+    @PostMapping("/{postNum}/cancel")
+    public Map<String, Object> cancel(@PathVariable("postNum") Integer postNum,
+                                      @AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            throw new RuntimeException("로그인이 필요합니다.");
+        }
+        Users user = userDetails.getUser();
+
+        if (user.isBlocked()) {
+            throw new RuntimeException("신고 누적으로 인해 러닝 참여가 제한되었습니다.");
+        }
+
+        System.out.println("[Controller] 취소 요청 - postNum=" + postNum + ", userNum=" + user.getUserNum());
+
+        boolean joined = false;
+        try {
+            joined = runningParticipantService.cancelParticipation(postNum, user);
+        } catch (Exception e) {
+            System.err.println("[Controller] 취소 처리 중 오류: " + e.getMessage());
+            throw e;
+        }
+
+        int currentParticipants = runningParticipantService.getCurrentParticipants(postNum);
+
+        System.out.println("[Controller] 취소 완료 - joined=" + joined + ", currentParticipants=" + currentParticipants);
+
+        List<Users> updatedParticipants = runningParticipantService.getActiveParticipants(postNum);
+
+        return Map.of(
+                "joined", joined,
+                "currentParticipants", currentParticipants,
+                "participants", updatedParticipants
+        );
+    }
+    
+ // 신고 API
+    @PostMapping("/{postNum}/report/{reportedUserNum}")
+    public Map<String, Object> reportUser(
+            @PathVariable("postNum") Integer postNum,
+            @PathVariable("reportedUserNum") Integer reportedUserNum,
+            @RequestBody Map<String,String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+    	  System.out.println("[REPORT] Controller hit: postNum=" + postNum + ", reportedUserNum=" + reportedUserNum);
+
+        if(userDetails == null){
+            return Map.of("success", false, "message", "로그인이 필요합니다.");
+        }
+
+        String reason = body.get("reason");
+        Integer reporterUserNum = userDetails.getUser().getUserNum();
+
+        try {
+            runningParticipantService.reportUser(reporterUserNum, reportedUserNum, reason, postNum);
+            System.out.println("[REPORT] Report processed successfully");
+            return Map.of("success", true);
+        } catch(RuntimeException e){
+            e.printStackTrace();
+            return Map.of("success", false, "message", e.getMessage());
+        }
+    }
+
+
+}
