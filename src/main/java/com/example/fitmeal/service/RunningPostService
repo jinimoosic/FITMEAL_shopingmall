@@ -1,0 +1,135 @@
+// src/main/java/com/example/fitmeal/service/RunningPostService.java
+package com.example.fitmeal.service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.example.fitmeal.domain.RunningCourse;
+import com.example.fitmeal.domain.RunningParticipant;
+import com.example.fitmeal.domain.RunningParticipantStatus;
+import com.example.fitmeal.domain.RunningPost;
+import com.example.fitmeal.domain.Users;
+import com.example.fitmeal.dto.RunningPostDTO;
+import com.example.fitmeal.repository.RunningCourseRepository;
+import com.example.fitmeal.repository.RunningParticipantRepository;
+import com.example.fitmeal.repository.RunningPostRepository;
+import com.example.fitmeal.repository.UsersRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class RunningPostService {
+
+    private final UsersRepository usersRepository;
+    private final RunningPostRepository runningPostRepository;
+    private final RunningCourseRepository runningCourseRepository;
+    private final RunningParticipantRepository participantRepository;
+
+    
+    //페이징 들어간 목록보기
+    public Page<RunningPost> getList(int page){
+    	List<Sort.Order> sorts = new ArrayList<>();
+    	sorts.add(Sort.Order.desc("postNum"));
+    	Pageable pageable = PageRequest.of(page, 10, Sort.by(sorts));
+    	return runningPostRepository.findAll(pageable);
+    }
+    
+ // 검색된 목록 보기
+    public Page<RunningPost> searchList(int page, String keyword) {
+        List<Sort.Order> sorts = new ArrayList<>();
+        sorts.add(Sort.Order.desc("postNum"));
+        Pageable pageable = PageRequest.of(page, 10, Sort.by(sorts));
+        return runningPostRepository.searchByKeyword(keyword, pageable);
+    }
+    
+    
+    
+    //포스트 글등록
+    
+    public Integer createPost(RunningPostDTO dto) {
+        // 작성자
+        Users user = usersRepository.findById(dto.getUserNum())
+                .orElseThrow(() -> new IllegalArgumentException("user not found: " + dto.getUserNum()));
+
+        // RunningPost 저장
+        RunningPost post = RunningPost.builder()
+                .user(user)
+                .title(dto.getTitle())
+                .content(dto.getContent())
+                .locationLat(dto.getLocationLat())
+                .locationLng(dto.getLocationLng())
+                .date(dto.getDate())
+                .startTime(dto.getStartTime())
+                .endTime(dto.getEndTime())
+                .maxParticipants(dto.getMaxParticipants())
+                .currentParticipants(0)
+                .isClosed(false)
+                .address(dto.getAddress())
+                .build();
+
+        runningPostRepository.save(post);
+
+        // RunningCourse 저장
+        var c = dto.getCourse();
+        if (c != null) {
+            RunningCourse course = RunningCourse.builder()
+                    .runningPost(post)
+                    .totalDistance(c.getTotalDistance())
+                    .estimatedTime(c.getEstimatedTime())
+                    .startLat(c.getStartLat())
+                    .startLng(c.getStartLng())
+                    .pathJson(c.getPathJson())
+                    .build();
+            runningCourseRepository.save(course);
+        }
+
+        RunningParticipant hostParticipant = RunningParticipant.builder()
+                .post(post)
+                .user(user)
+                .status(RunningParticipantStatus.JOINED)
+                .host(true)   
+                .build();
+        participantRepository.save(hostParticipant);
+
+        post.setCurrentParticipants(1);
+        runningPostRepository.save(post);
+        
+        
+        return post.getPostNum();
+    }
+    
+    public int getCurrentParticipants(Integer postNum) {
+        return runningPostRepository.findById(postNum)
+                .map(RunningPost::getCurrentParticipants)
+                .orElse(0);
+    }
+
+
+    public RunningPost findById(Integer id) {
+        return runningPostRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("게시글이 존재하지 않습니다."));
+    }
+    
+    
+    @Transactional
+    public void deletePost(Integer postNum) {
+        RunningPost post = runningPostRepository.findById(postNum)
+            .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. postNum=" + postNum));
+
+        participantRepository.deleteByPost(post);
+
+        runningCourseRepository.findByPostNum(postNum)
+            .ifPresent(runningCourseRepository::delete);
+
+        runningPostRepository.delete(post);
+    }
+}
